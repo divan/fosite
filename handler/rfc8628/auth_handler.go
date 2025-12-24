@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ory/fosite"
-	"github.com/ory/x/errorsx"
 	"github.com/pkg/errors"
 )
 
@@ -51,7 +50,7 @@ func (d *DeviceAuthHandler) handleDeviceAuthSession(ctx context.Context, dar fos
 
 	deviceCode, deviceCodeSignature, err := d.Strategy.GenerateDeviceCode(ctx)
 	if err != nil {
-		return "", "", errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+		return "", "", errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	dar.GetSession().SetExpiresAt(fosite.UserCode, time.Now().UTC().Add(d.Config.GetDeviceAndUserCodeLifespan(ctx)).Round(time.Second))
@@ -65,7 +64,7 @@ func (d *DeviceAuthHandler) handleDeviceAuthSession(ctx context.Context, dar fos
 	for i := 0; i < MaxAttempts; i++ {
 		userCode, userCodeSignature, err = d.Strategy.GenerateUserCode(ctx)
 		if err != nil {
-			return "", "", errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+			return "", "", errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 		}
 
 		err = d.Storage.CreateDeviceAuthSession(ctx, deviceCodeSignature, userCodeSignature, dar.Sanitize(nil).(fosite.DeviceRequester))
@@ -73,13 +72,13 @@ func (d *DeviceAuthHandler) handleDeviceAuthSession(ctx context.Context, dar fos
 			break
 		}
 		if !errors.Is(err, fosite.ErrExistingUserCodeSignature) {
-			return "", "", errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+			return "", "", errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 		}
 	}
 
 	if err != nil {
 		errMsg := fmt.Sprintf("Exceeded user-code generation max attempts %v: %s", MaxAttempts, err.Error())
-		return "", "", errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(errMsg))
+		return "", "", errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(errMsg))
 	}
 	return deviceCode, userCode, nil
 }

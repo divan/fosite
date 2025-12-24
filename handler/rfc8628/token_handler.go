@@ -13,7 +13,6 @@ import (
 
 	"github.com/ory/fosite/handler/oauth2"
 	"github.com/ory/fosite/storage"
-	"github.com/ory/x/errorsx"
 
 	"github.com/ory/fosite"
 )
@@ -53,7 +52,7 @@ func (v DeviceCodeTokenEndpointHandler) CanHandleRequest(requester fosite.Access
 
 func (c *DeviceCodeTokenEndpointHandler) PopulateTokenEndpointResponse(ctx context.Context, requester fosite.AccessRequester, responder fosite.AccessResponder) error {
 	if !c.CanHandleTokenEndpointRequest(ctx, requester) {
-		return errorsx.WithStack(fosite.ErrUnknownRequest)
+		return errors.WithStack(fosite.ErrUnknownRequest)
 	}
 
 	var code, signature string
@@ -64,11 +63,11 @@ func (c *DeviceCodeTokenEndpointHandler) PopulateTokenEndpointResponse(ctx conte
 
 	var ar fosite.DeviceRequester
 	if ar, err = c.session(ctx, requester, signature); err != nil {
-		return errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	if err = c.DeviceCodeStrategy.ValidateDeviceCode(ctx, ar, code); err != nil {
-		return errorsx.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	for _, scope := range ar.GetGrantedScopes() {
@@ -82,40 +81,40 @@ func (c *DeviceCodeTokenEndpointHandler) PopulateTokenEndpointResponse(ctx conte
 	var accessToken, accessTokenSignature string
 	accessToken, accessTokenSignature, err = c.AccessTokenStrategy.GenerateAccessToken(ctx, requester)
 	if err != nil {
-		return errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	var refreshToken, refreshTokenSignature string
 	if c.canIssueRefreshToken(ctx, requester) {
 		refreshToken, refreshTokenSignature, err = c.RefreshTokenStrategy.GenerateRefreshToken(ctx, requester)
 		if err != nil {
-			return errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+			return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 		}
 	}
 
 	ctx, err = storage.MaybeBeginTx(ctx, c.CoreStorage)
 	if err != nil {
-		return errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 	defer func() {
 		if err != nil {
 			if rollBackTxnErr := storage.MaybeRollbackTx(ctx, c.CoreStorage); rollBackTxnErr != nil {
-				err = errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebugf("error: %s; rollback error: %s", err, rollBackTxnErr))
+				err = errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebugf("error: %s; rollback error: %s", err, rollBackTxnErr))
 			}
 		}
 	}()
 
 	if err = c.CoreStorage.InvalidateDeviceCodeSession(ctx, signature); err != nil {
-		return errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	if err = c.CoreStorage.CreateAccessTokenSession(ctx, accessTokenSignature, requester.Sanitize([]string{})); err != nil {
-		return errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	if refreshTokenSignature != "" {
 		if err = c.CoreStorage.CreateRefreshTokenSession(ctx, refreshTokenSignature, accessTokenSignature, requester.Sanitize([]string{})); err != nil {
-			return errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+			return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 		}
 	}
 
@@ -129,7 +128,7 @@ func (c *DeviceCodeTokenEndpointHandler) PopulateTokenEndpointResponse(ctx conte
 	}
 
 	if err = storage.MaybeCommitTx(ctx, c.CoreStorage); err != nil {
-		return errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	return nil
@@ -137,7 +136,7 @@ func (c *DeviceCodeTokenEndpointHandler) PopulateTokenEndpointResponse(ctx conte
 
 func (c *DeviceCodeTokenEndpointHandler) HandleTokenEndpointRequest(ctx context.Context, requester fosite.AccessRequester) error {
 	if !c.CanHandleTokenEndpointRequest(ctx, requester) {
-		return errorsx.WithStack(errorsx.WithStack(fosite.ErrUnknownRequest))
+		return errors.WithStack(errors.WithStack(fosite.ErrUnknownRequest))
 	}
 
 	var err error
@@ -151,7 +150,7 @@ func (c *DeviceCodeTokenEndpointHandler) HandleTokenEndpointRequest(ctx context.
 	}
 
 	if err = c.validateCode(ctx, requester, code); err != nil {
-		return errorsx.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	var ar fosite.DeviceRequester
@@ -164,7 +163,7 @@ func (c *DeviceCodeTokenEndpointHandler) HandleTokenEndpointRequest(ctx context.
 	}
 
 	if err = c.DeviceCodeStrategy.ValidateDeviceCode(ctx, ar, code); err != nil {
-		return errorsx.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	// Override scopes
@@ -177,7 +176,7 @@ func (c *DeviceCodeTokenEndpointHandler) HandleTokenEndpointRequest(ctx context.
 	// the authorization code was issued to the authenticated confidential client,
 	// or if the client is public, ensure that the code was issued to "client_id" in the request
 	if ar.GetClient().GetID() != requester.GetClient().GetID() {
-		return errorsx.WithStack(fosite.ErrInvalidGrant.WithHint("The OAuth 2.0 Client ID from this request does not match the one from the authorize request."))
+		return errors.WithStack(fosite.ErrInvalidGrant.WithHint("The OAuth 2.0 Client ID from this request does not match the one from the authorize request."))
 	}
 
 	// Checking of POST client_id skipped, because
@@ -227,7 +226,7 @@ func (c *DeviceCodeTokenEndpointHandler) revokeTokens(ctx context.Context, reqId
 	revokeAndAppendErr("access", c.TokenRevocationStorage.RevokeAccessToken)
 	revokeAndAppendErr("refresh", c.TokenRevocationStorage.RevokeRefreshToken)
 
-	return errorsx.WithStack(fosite.ErrInvalidGrant.WithHint(hint).WithDebug(debug.String()))
+	return errors.WithStack(fosite.ErrInvalidGrant.WithHint(hint).WithDebug(debug.String()))
 }
 
 func (c DeviceCodeTokenEndpointHandler) deviceCode(ctx context.Context, requester fosite.AccessRequester) (code string, signature string, err error) {
@@ -235,7 +234,7 @@ func (c DeviceCodeTokenEndpointHandler) deviceCode(ctx context.Context, requeste
 
 	signature, err = c.DeviceCodeStrategy.DeviceCodeSignature(ctx, code)
 	if err != nil {
-		return "", "", errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+		return "", "", errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	return
@@ -247,7 +246,7 @@ func (c DeviceCodeTokenEndpointHandler) validateCode(ctx context.Context, reques
 		return err
 	}
 	if shouldRateLimit {
-		return errorsx.WithStack(fosite.ErrSlowDown)
+		return errors.WithStack(fosite.ErrSlowDown)
 	}
 	return nil
 }
@@ -266,11 +265,11 @@ func (s DeviceCodeTokenEndpointHandler) session(ctx context.Context, requester f
 	}
 
 	if err != nil && errors.Is(err, fosite.ErrNotFound) {
-		return nil, errorsx.WithStack(fosite.ErrInvalidGrant.WithWrap(err).WithDebug(err.Error()))
+		return nil, errors.WithStack(fosite.ErrInvalidGrant.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	if err != nil {
-		return nil, errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+		return nil, errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	state := req.GetUserCodeState()
@@ -287,7 +286,7 @@ func (s DeviceCodeTokenEndpointHandler) session(ctx context.Context, requester f
 
 func (v DeviceCodeTokenEndpointHandler) validateGrantTypes(requester fosite.AccessRequester) error {
 	if !requester.GetClient().GetGrantTypes().Has(string(fosite.GrantTypeDeviceCode)) {
-		return errorsx.WithStack(fosite.ErrUnauthorizedClient.WithHint("The OAuth 2.0 Client is not allowed to use authorization grant \"urn:ietf:params:oauth:grant-type:device_code\"."))
+		return errors.WithStack(fosite.ErrUnauthorizedClient.WithHint("The OAuth 2.0 Client is not allowed to use authorization grant \"urn:ietf:params:oauth:grant-type:device_code\"."))
 	}
 
 	return nil

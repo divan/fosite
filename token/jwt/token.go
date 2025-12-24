@@ -12,7 +12,7 @@ import (
 	"github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
 
-	"github.com/ory/x/errorsx"
+	"github.com/pkg/errors"
 )
 
 // Token represets a JWT Token
@@ -90,7 +90,7 @@ func (t *Token) SignedString(k interface{}) (rawToken string, err error) {
 	opts := &jose.SignerOptions{ExtraHeaders: t.toJoseHeader()}
 	signer, err = jose.NewSigner(key, opts)
 	if err != nil {
-		err = errorsx.WithStack(err)
+		err = errors.WithStack(err)
 		return
 	}
 
@@ -114,11 +114,11 @@ func unsignedToken(t *Token) (string, error) {
 	}
 	hbytes, err := json.Marshal(&t.Header)
 	if err != nil {
-		return "", errorsx.WithStack(err)
+		return "", errors.WithStack(err)
 	}
 	bbytes, err := json.Marshal(&t.Claims)
 	if err != nil {
-		return "", errorsx.WithStack(err)
+		return "", errors.WithStack(err)
 	}
 	h := base64.RawURLEncoding.EncodeToString(hbytes)
 	b := base64.RawURLEncoding.EncodeToString(bbytes)

@@ -6,7 +6,7 @@ package fosite
 import (
 	"context"
 
-	"github.com/ory/x/errorsx"
+	"github.com/pkg/errors"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -27,14 +27,14 @@ func (b *BCrypt) Hash(ctx context.Context, data []byte) ([]byte, error) {
 	}
 	s, err := bcrypt.GenerateFromPassword(data, wf)
 	if err != nil {
-		return nil, errorsx.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 	return s, nil
 }
 
 func (b *BCrypt) Compare(ctx context.Context, hash, data []byte) error {
 	if err := bcrypt.CompareHashAndPassword(hash, data); err != nil {
-		return errorsx.WithStack(err)
+		return errors.WithStack(err)
 	}
 	return nil
 }

@@ -9,20 +9,15 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ory/x/errorsx"
-	"github.com/ory/x/otelx"
-	"go.opentelemetry.io/otel/trace"
+	"github.com/pkg/errors"
 )
 
 // NewPushedAuthorizeResponse executes the handlers and builds the response
-func (f *Fosite) NewPushedAuthorizeResponse(ctx context.Context, ar AuthorizeRequester, session Session) (_ PushedAuthorizeResponder, err error) {
-	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer("github.com/ory/fosite").Start(ctx, "Fosite.NewPushedAuthorizeResponse")
-	defer otelx.End(span, &err)
-
+func (f *Fosite) NewPushedAuthorizeResponse(ctx context.Context, ar AuthorizeRequester, session Session) (PushedAuthorizeResponder, error) {
 	// Get handlers. If no handlers are defined, this is considered a misconfigured Fosite instance.
 	handlersProvider, ok := f.Config.(PushedAuthorizeRequestHandlersProvider)
 	if !ok {
-		return nil, errorsx.WithStack(ErrServerError.WithHint(ErrorPARNotSupported).WithDebug(DebugPARRequestsHandlerMissing))
+		return nil, errors.WithStack(ErrServerError.WithHint(ErrorPARNotSupported).WithDebug(DebugPARRequestsHandlerMissing))
 	}
 
 	var resp = &PushedAuthorizeResponse{

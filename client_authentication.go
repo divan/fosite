@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ory/x/errorsx"
-
 	"github.com/go-jose/go-jose/v3"
 	"github.com/pkg/errors"
 
@@ -51,7 +49,7 @@ func (f *Fosite) findClientPublicJWK(ctx context.Context, oidcClient OpenIDConne
 		return findPublicKey(t, keys, expectsRSAKey)
 	}
 
-	return nil, errorsx.WithStack(ErrInvalidClient.WithHint("The OAuth 2.0 Client has no JSON Web Keys set registered, but they are needed to complete the request."))
+	return nil, errors.WithStack(ErrInvalidClient.WithHint("The OAuth 2.0 Client has no JSON Web Keys set registered, but they are needed to complete the request."))
 }
 
 // AuthenticateClient authenticates client requests using the configured strategy
@@ -69,7 +67,7 @@ func (f *Fosite) DefaultClientAuthenticationStrategy(ctx context.Context, r *htt
 	if assertionType := form.Get("client_assertion_type"); assertionType == clientAssertionJWTBearerType {
 		assertion := form.Get("client_assertion")
 		if len(assertion) == 0 {
-			return nil, errorsx.WithStack(ErrInvalidRequest.WithHintf("The client_assertion request parameter must be set when using client_assertion_type of '%s'.", clientAssertionJWTBearerType))
+			return nil, errors.WithStack(ErrInvalidRequest.WithHintf("The client_assertion request parameter must be set when using client_assertion_type of '%s'.", clientAssertionJWTBearerType))
 		}
 
 		var clientID string
@@ -85,7 +83,7 @@ func (f *Fosite) DefaultClientAuthenticationStrategy(ctx context.Context, r *htt
 			if clientID == "" {
 				claims := t.Claims
 				if sub, ok := claims["sub"].(string); !ok {
-					return nil, errorsx.WithStack(ErrInvalidClient.WithHint("The claim 'sub' from the client_assertion JSON Web Token is undefined."))
+					return nil, errors.WithStack(ErrInvalidClient.WithHint("The claim 'sub' from the client_assertion JSON Web Token is undefined."))
 				} else {
 					clientID = sub
 				}
@@ -93,31 +91,31 @@ func (f *Fosite) DefaultClientAuthenticationStrategy(ctx context.Context, r *htt
 
 			client, err = f.Store.GetClient(ctx, clientID)
 			if err != nil {
-				return nil, errorsx.WithStack(ErrInvalidClient.WithWrap(err).WithDebug(err.Error()))
+				return nil, errors.WithStack(ErrInvalidClient.WithWrap(err).WithDebug(err.Error()))
 			}
 
 			oidcClient, ok := client.(OpenIDConnectClient)
 			if !ok {
-				return nil, errorsx.WithStack(ErrInvalidRequest.WithHint("The server configuration does not support OpenID Connect specific authentication methods."))
+				return nil, errors.WithStack(ErrInvalidRequest.WithHint("The server configuration does not support OpenID Connect specific authentication methods."))
 			}
 
 			switch oidcClient.GetTokenEndpointAuthMethod() {
 			case "private_key_jwt":
 				break
 			case "none":
-				return nil, errorsx.WithStack(ErrInvalidClient.WithHint("This requested OAuth 2.0 client does not support client authentication, however 'client_assertion' was provided in the request."))
+				return nil, errors.WithStack(ErrInvalidClient.WithHint("This requested OAuth 2.0 client does not support client authentication, however 'client_assertion' was provided in the request."))
 			case "client_secret_post":
 				fallthrough
 			case "client_secret_basic":
-				return nil, errorsx.WithStack(ErrInvalidClient.WithHintf("This requested OAuth 2.0 client only supports client authentication method '%s', however 'client_assertion' was provided in the request.", oidcClient.GetTokenEndpointAuthMethod()))
+				return nil, errors.WithStack(ErrInvalidClient.WithHintf("This requested OAuth 2.0 client only supports client authentication method '%s', however 'client_assertion' was provided in the request.", oidcClient.GetTokenEndpointAuthMethod()))
 			case "client_secret_jwt":
 				fallthrough
 			default:
-				return nil, errorsx.WithStack(ErrInvalidClient.WithHintf("This requested OAuth 2.0 client only supports client authentication method '%s', however that method is not supported by this server.", oidcClient.GetTokenEndpointAuthMethod()))
+				return nil, errors.WithStack(ErrInvalidClient.WithHintf("This requested OAuth 2.0 client only supports client authentication method '%s', however that method is not supported by this server.", oidcClient.GetTokenEndpointAuthMethod()))
 			}
 
 			if oidcClient.GetTokenEndpointAuthSigningAlgorithm() != fmt.Sprintf("%s", t.Header["alg"]) {
-				return nil, errorsx.WithStack(ErrInvalidClient.WithHintf("The 'client_assertion' uses signing algorithm '%s' but the requested OAuth 2.0 Client enforces signing algorithm '%s'.", t.Header["alg"], oidcClient.GetTokenEndpointAuthSigningAlgorithm()))
+				return nil, errors.WithStack(ErrInvalidClient.WithHintf("The 'client_assertion' uses signing algorithm '%s' but the requested OAuth 2.0 Client enforces signing algorithm '%s'.", t.Header["alg"], oidcClient.GetTokenEndpointAuthSigningAlgorithm()))
 			}
 			switch t.Method {
 			case jose.RS256, jose.RS384, jose.RS512:
@@ -127,9 +125,9 @@ func (f *Fosite) DefaultClientAuthenticationStrategy(ctx context.Context, r *htt
 			case jose.PS256, jose.PS384, jose.PS512:
 				return f.findClientPublicJWK(ctx, oidcClient, t, true)
 			case jose.HS256, jose.HS384, jose.HS512:
-				return nil, errorsx.WithStack(ErrInvalidClient.WithHint("This authorization server does not support client authentication method 'client_secret_jwt'."))
+				return nil, errors.WithStack(ErrInvalidClient.WithHint("This authorization server does not support client authentication method 'client_secret_jwt'."))
 			default:
-				return nil, errorsx.WithStack(ErrInvalidClient.WithHintf("The 'client_assertion' request parameter uses unsupported signing algorithm '%s'.", t.Header["alg"]))
+				return nil, errors.WithStack(ErrInvalidClient.WithHintf("The 'client_assertion' request parameter uses unsupported signing algorithm '%s'.", t.Header["alg"]))
 			}
 		})
 		if err != nil {
@@ -139,25 +137,25 @@ func (f *Fosite) DefaultClientAuthenticationStrategy(ctx context.Context, r *htt
 				if e.Inner != nil {
 					return nil, e.Inner
 				}
-				return nil, errorsx.WithStack(ErrInvalidClient.WithHint("Unable to verify the integrity of the 'client_assertion' value.").WithWrap(err).WithDebug(err.Error()))
+				return nil, errors.WithStack(ErrInvalidClient.WithHint("Unable to verify the integrity of the 'client_assertion' value.").WithWrap(err).WithDebug(err.Error()))
 			}
 			return nil, err
 		} else if err := token.Claims.Valid(); err != nil {
-			return nil, errorsx.WithStack(ErrInvalidClient.WithHint("Unable to verify the request object because its claims could not be validated, check if the expiry time is set correctly.").WithWrap(err).WithDebug(err.Error()))
+			return nil, errors.WithStack(ErrInvalidClient.WithHint("Unable to verify the request object because its claims could not be validated, check if the expiry time is set correctly.").WithWrap(err).WithDebug(err.Error()))
 		}
 
 		claims := token.Claims
 		var jti string
 		if !claims.VerifyIssuer(clientID, true) {
-			return nil, errorsx.WithStack(ErrInvalidClient.WithHint("Claim 'iss' from 'client_assertion' must match the 'client_id' of the OAuth 2.0 Client."))
+			return nil, errors.WithStack(ErrInvalidClient.WithHint("Claim 'iss' from 'client_assertion' must match the 'client_id' of the OAuth 2.0 Client."))
 		} else if len(f.Config.GetTokenURLs(ctx)) == 0 {
-			return nil, errorsx.WithStack(ErrMisconfiguration.WithHint("The authorization server's token endpoint URL has not been set."))
+			return nil, errors.WithStack(ErrMisconfiguration.WithHint("The authorization server's token endpoint URL has not been set."))
 		} else if sub, ok := claims["sub"].(string); !ok || sub != clientID {
-			return nil, errorsx.WithStack(ErrInvalidClient.WithHint("Claim 'sub' from 'client_assertion' must match the 'client_id' of the OAuth 2.0 Client."))
+			return nil, errors.WithStack(ErrInvalidClient.WithHint("Claim 'sub' from 'client_assertion' must match the 'client_id' of the OAuth 2.0 Client."))
 		} else if jti, ok = claims["jti"].(string); !ok || len(jti) == 0 {
-			return nil, errorsx.WithStack(ErrInvalidClient.WithHint("Claim 'jti' from 'client_assertion' must be set but is not."))
+			return nil, errors.WithStack(ErrInvalidClient.WithHint("Claim 'jti' from 'client_assertion' must be set but is not."))
 		} else if f.Store.ClientAssertionJWTValid(ctx, jti) != nil {
-			return nil, errorsx.WithStack(ErrJTIKnown.WithHint("Claim 'jti' from 'client_assertion' MUST only be used once."))
+			return nil, errors.WithStack(ErrJTIKnown.WithHint("Claim 'jti' from 'client_assertion' MUST only be used once."))
 		}
 
 		// type conversion according to jwt.MapClaims.VerifyExpiresAt
@@ -175,21 +173,21 @@ func (f *Fosite) DefaultClientAuthenticationStrategy(ctx context.Context, r *htt
 		}
 
 		if err != nil {
-			return nil, errorsx.WithStack(err)
+			return nil, errors.WithStack(err)
 		}
 		if err := f.Store.SetClientAssertionJWT(ctx, jti, time.Unix(expiry, 0)); err != nil {
 			return nil, err
 		}
 
 		if !audienceMatchesTokenURLs(claims, f.Config.GetTokenURLs(ctx)) {
-			return nil, errorsx.WithStack(ErrInvalidClient.WithHintf(
+			return nil, errors.WithStack(ErrInvalidClient.WithHintf(
 				"Claim 'audience' from 'client_assertion' must match the authorization server's token endpoint '%s'.",
 				strings.Join(f.Config.GetTokenURLs(ctx), "' or '")))
 		}
 
 		return client, nil
 	} else if len(assertionType) > 0 {
-		return nil, errorsx.WithStack(ErrInvalidRequest.WithHintf("Unknown client_assertion_type '%s'.", assertionType))
+		return nil, errors.WithStack(ErrInvalidRequest.WithHintf("Unknown client_assertion_type '%s'.", assertionType))
 	}
 
 	clientID, clientSecret, err := clientCredentialsFromRequest(r, form)
@@ -199,17 +197,17 @@ func (f *Fosite) DefaultClientAuthenticationStrategy(ctx context.Context, r *htt
 
 	client, err := f.Store.GetClient(ctx, clientID)
 	if err != nil {
-		return nil, errorsx.WithStack(ErrInvalidClient.WithWrap(err).WithDebug(err.Error()))
+		return nil, errors.WithStack(ErrInvalidClient.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	if oidcClient, ok := client.(OpenIDConnectClient); !ok {
 		// If this isn't an OpenID Connect client then we actually don't care about any of this, just continue!
 	} else if ok && form.Get("client_id") != "" && form.Get("client_secret") != "" && oidcClient.GetTokenEndpointAuthMethod() != "client_secret_post" {
-		return nil, errorsx.WithStack(ErrInvalidClient.WithHintf("The OAuth 2.0 Client supports client authentication method '%s', but method 'client_secret_post' was requested. You must configure the OAuth 2.0 client's 'token_endpoint_auth_method' value to accept 'client_secret_post'.", oidcClient.GetTokenEndpointAuthMethod()))
+		return nil, errors.WithStack(ErrInvalidClient.WithHintf("The OAuth 2.0 Client supports client authentication method '%s', but method 'client_secret_post' was requested. You must configure the OAuth 2.0 client's 'token_endpoint_auth_method' value to accept 'client_secret_post'.", oidcClient.GetTokenEndpointAuthMethod()))
 	} else if _, secret, basicOk := r.BasicAuth(); basicOk && ok && secret != "" && oidcClient.GetTokenEndpointAuthMethod() != "client_secret_basic" {
-		return nil, errorsx.WithStack(ErrInvalidClient.WithHintf("The OAuth 2.0 Client supports client authentication method '%s', but method 'client_secret_basic' was requested. You must configure the OAuth 2.0 client's 'token_endpoint_auth_method' value to accept 'client_secret_basic'.", oidcClient.GetTokenEndpointAuthMethod()))
+		return nil, errors.WithStack(ErrInvalidClient.WithHintf("The OAuth 2.0 Client supports client authentication method '%s', but method 'client_secret_basic' was requested. You must configure the OAuth 2.0 client's 'token_endpoint_auth_method' value to accept 'client_secret_basic'.", oidcClient.GetTokenEndpointAuthMethod()))
 	} else if ok && oidcClient.GetTokenEndpointAuthMethod() != "none" && client.IsPublic() {
-		return nil, errorsx.WithStack(ErrInvalidClient.WithHintf("The OAuth 2.0 Client supports client authentication method '%s', but method 'none' was requested. You must configure the OAuth 2.0 client's 'token_endpoint_auth_method' value to accept 'none'.", oidcClient.GetTokenEndpointAuthMethod()))
+		return nil, errors.WithStack(ErrInvalidClient.WithHintf("The OAuth 2.0 Client supports client authentication method '%s', but method 'none' was requested. You must configure the OAuth 2.0 client's 'token_endpoint_auth_method' value to accept 'none'.", oidcClient.GetTokenEndpointAuthMethod()))
 	}
 
 	if client.IsPublic() {
@@ -218,7 +216,7 @@ func (f *Fosite) DefaultClientAuthenticationStrategy(ctx context.Context, r *htt
 
 	// Enforce client authentication
 	if err := f.checkClientSecret(ctx, client, []byte(clientSecret)); err != nil {
-		return nil, errorsx.WithStack(ErrInvalidClient.WithWrap(err).WithDebug(err.Error()))
+		return nil, errors.WithStack(ErrInvalidClient.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	return client, nil
@@ -268,7 +266,7 @@ func (f *Fosite) checkClientSecret(ctx context.Context, client Client, clientSec
 func findPublicKey(t *jwt.Token, set *jose.JSONWebKeySet, expectsRSAKey bool) (interface{}, error) {
 	keys := set.Keys
 	if len(keys) == 0 {
-		return nil, errorsx.WithStack(ErrInvalidRequest.WithHintf("The retrieved JSON Web Key Set does not contain any key."))
+		return nil, errors.WithStack(ErrInvalidRequest.WithHintf("The retrieved JSON Web Key Set does not contain any key."))
 	}
 
 	kid, ok := t.Header["kid"].(string)
@@ -277,7 +275,7 @@ func findPublicKey(t *jwt.Token, set *jose.JSONWebKeySet, expectsRSAKey bool) (i
 	}
 
 	if len(keys) == 0 {
-		return nil, errorsx.WithStack(ErrInvalidRequest.WithHintf("The JSON Web Token uses signing key with kid '%s', which could not be found.", kid))
+		return nil, errors.WithStack(ErrInvalidRequest.WithHintf("The JSON Web Token uses signing key with kid '%s', which could not be found.", kid))
 	}
 
 	for _, key := range keys {
@@ -296,9 +294,9 @@ func findPublicKey(t *jwt.Token, set *jose.JSONWebKeySet, expectsRSAKey bool) (i
 	}
 
 	if expectsRSAKey {
-		return nil, errorsx.WithStack(ErrInvalidRequest.WithHintf("Unable to find RSA public key with use='sig' for kid '%s' in JSON Web Key Set.", kid))
+		return nil, errors.WithStack(ErrInvalidRequest.WithHintf("Unable to find RSA public key with use='sig' for kid '%s' in JSON Web Key Set.", kid))
 	} else {
-		return nil, errorsx.WithStack(ErrInvalidRequest.WithHintf("Unable to find ECDSA public key with use='sig' for kid '%s' in JSON Web Key Set.", kid))
+		return nil, errors.WithStack(ErrInvalidRequest.WithHintf("Unable to find ECDSA public key with use='sig' for kid '%s' in JSON Web Key Set.", kid))
 	}
 }
 
@@ -306,9 +304,9 @@ func clientCredentialsFromRequest(r *http.Request, form url.Values) (clientID, c
 	if id, secret, ok := r.BasicAuth(); !ok {
 		return clientCredentialsFromRequestBody(form, true)
 	} else if clientID, err = url.QueryUnescape(id); err != nil {
-		return "", "", errorsx.WithStack(ErrInvalidRequest.WithHint("The client id in the HTTP authorization header could not be decoded from 'application/x-www-form-urlencoded'.").WithWrap(err).WithDebug(err.Error()))
+		return "", "", errors.WithStack(ErrInvalidRequest.WithHint("The client id in the HTTP authorization header could not be decoded from 'application/x-www-form-urlencoded'.").WithWrap(err).WithDebug(err.Error()))
 	} else if clientSecret, err = url.QueryUnescape(secret); err != nil {
-		return "", "", errorsx.WithStack(ErrInvalidRequest.WithHint("The client secret in the HTTP authorization header could not be decoded from 'application/x-www-form-urlencoded'.").WithWrap(err).WithDebug(err.Error()))
+		return "", "", errors.WithStack(ErrInvalidRequest.WithHint("The client secret in the HTTP authorization header could not be decoded from 'application/x-www-form-urlencoded'.").WithWrap(err).WithDebug(err.Error()))
 	}
 
 	return clientID, clientSecret, nil
@@ -319,7 +317,7 @@ func clientCredentialsFromRequestBody(form url.Values, forceID bool) (clientID, 
 	clientSecret = form.Get("client_secret")
 
 	if clientID == "" && forceID {
-		return "", "", errorsx.WithStack(ErrInvalidRequest.WithHint("Client credentials missing or malformed in both HTTP Authorization header and HTTP POST body."))
+		return "", "", errors.WithStack(ErrInvalidRequest.WithHint("Client credentials missing or malformed in both HTTP Authorization header and HTTP POST body."))
 	}
 
 	return clientID, clientSecret, nil

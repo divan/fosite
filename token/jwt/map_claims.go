@@ -7,12 +7,10 @@ import (
 	"bytes"
 	"crypto/subtle"
 	"encoding/json"
-	"errors"
 	"time"
 
 	jjson "github.com/go-jose/go-jose/v3/json"
-
-	"github.com/ory/x/errorsx"
+	"github.com/pkg/errors"
 )
 
 var TimeFunc = time.Now
@@ -143,7 +141,7 @@ func (m MapClaims) UnmarshalJSON(b []byte) error {
 	mp := map[string]interface{}(m)
 	d.SetNumberType(jjson.UnmarshalIntOrFloat)
 	if err := d.Decode(&mp); err != nil {
-		return errorsx.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	return nil

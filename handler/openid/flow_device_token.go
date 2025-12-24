@@ -9,49 +9,48 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ory/fosite"
-	"github.com/ory/x/errorsx"
 )
 
 func (c *OpenIDConnectDeviceHandler) HandleTokenEndpointRequest(ctx context.Context, requester fosite.AccessRequester) error {
-	return errorsx.WithStack(fosite.ErrUnknownRequest)
+	return errors.WithStack(fosite.ErrUnknownRequest)
 }
 
 func (c *OpenIDConnectDeviceHandler) PopulateTokenEndpointResponse(ctx context.Context, requester fosite.AccessRequester, responder fosite.AccessResponder) error {
 	if !c.CanHandleTokenEndpointRequest(ctx, requester) {
-		return errorsx.WithStack(fosite.ErrUnknownRequest)
+		return errors.WithStack(fosite.ErrUnknownRequest)
 	}
 
 	if !requester.GetClient().GetGrantTypes().Has(string(fosite.GrantTypeDeviceCode)) {
-		return errorsx.WithStack(fosite.ErrUnauthorizedClient.WithHint("The OAuth 2.0 Client is not allowed to use the authorization grant \"urn:ietf:params:oauth:grant-type:device_code\"."))
+		return errors.WithStack(fosite.ErrUnauthorizedClient.WithHint("The OAuth 2.0 Client is not allowed to use the authorization grant \"urn:ietf:params:oauth:grant-type:device_code\"."))
 	}
 
 	deviceCode := requester.GetRequestForm().Get("device_code")
 	signature, _ := c.DeviceCodeStrategy.DeviceCodeSignature(ctx, deviceCode)
 	ar, err := c.OpenIDConnectRequestStorage.GetOpenIDConnectSession(ctx, signature, requester)
 	if errors.Is(err, ErrNoSessionFound) {
-		return errorsx.WithStack(fosite.ErrUnknownRequest.WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(fosite.ErrUnknownRequest.WithWrap(err).WithDebug(err.Error()))
 	}
 	if err != nil {
-		return errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	if !ar.GetGrantedScopes().Has("openid") {
-		return errorsx.WithStack(fosite.ErrMisconfiguration.WithDebug("An OpenID Connect session was found but the openid scope is missing, probably due to a broken code configuration."))
+		return errors.WithStack(fosite.ErrMisconfiguration.WithDebug("An OpenID Connect session was found but the openid scope is missing, probably due to a broken code configuration."))
 	}
 
 	session, ok := ar.GetSession().(Session)
 	if !ok {
-		return errorsx.WithStack(fosite.ErrServerError.WithDebug("Failed to generate id token because session must be of type fosite/handler/openid.Session."))
+		return errors.WithStack(fosite.ErrServerError.WithDebug("Failed to generate id token because session must be of type fosite/handler/openid.Session."))
 	}
 
 	claims := session.IDTokenClaims()
 	if claims.Subject == "" {
-		return errorsx.WithStack(fosite.ErrServerError.WithDebug("Failed to generate id token because subject is an empty string."))
+		return errors.WithStack(fosite.ErrServerError.WithDebug("Failed to generate id token because subject is an empty string."))
 	}
 
 	err = c.OpenIDConnectRequestStorage.DeleteOpenIDConnectSession(ctx, deviceCode)
 	if err != nil {
-		return errorsx.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 
 	claims.AccessTokenHash = c.GetAccessTokenHash(ctx, requester, responder)

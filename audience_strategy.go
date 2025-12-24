@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/ory/x/errorsx"
+	"github.com/pkg/errors"
 )
 
 type AudienceMatchingStrategy func(haystack []string, needle []string) error
@@ -22,14 +22,14 @@ func DefaultAudienceMatchingStrategy(haystack []string, needle []string) error {
 	for _, n := range needle {
 		nu, err := url.Parse(n)
 		if err != nil {
-			return errorsx.WithStack(ErrInvalidRequest.WithHintf("Unable to parse requested audience '%s'.", n).WithWrap(err).WithDebug(err.Error()))
+			return errors.WithStack(ErrInvalidRequest.WithHintf("Unable to parse requested audience '%s'.", n).WithWrap(err).WithDebug(err.Error()))
 		}
 
 		var found bool
 		for _, h := range haystack {
 			hu, err := url.Parse(h)
 			if err != nil {
-				return errorsx.WithStack(ErrInvalidRequest.WithHintf("Unable to parse whitelisted audience '%s'.", h).WithWrap(err).WithDebug(err.Error()))
+				return errors.WithStack(ErrInvalidRequest.WithHintf("Unable to parse whitelisted audience '%s'.", h).WithWrap(err).WithDebug(err.Error()))
 			}
 
 			allowedPath := strings.TrimRight(hu.Path, "/")
@@ -43,7 +43,7 @@ func DefaultAudienceMatchingStrategy(haystack []string, needle []string) error {
 		}
 
 		if !found {
-			return errorsx.WithStack(ErrInvalidRequest.WithHintf("Requested audience '%s' has not been whitelisted by the OAuth 2.0 Client.", n))
+			return errors.WithStack(ErrInvalidRequest.WithHintf("Requested audience '%s' has not been whitelisted by the OAuth 2.0 Client.", n))
 		}
 	}
 
@@ -68,7 +68,7 @@ func ExactAudienceMatchingStrategy(haystack []string, needle []string) error {
 		}
 
 		if !found {
-			return errorsx.WithStack(ErrInvalidRequest.WithHintf(`Requested audience "%s" has not been whitelisted by the OAuth 2.0 Client.`, n))
+			return errors.WithStack(ErrInvalidRequest.WithHintf(`Requested audience "%s" has not been whitelisted by the OAuth 2.0 Client.`, n))
 		}
 	}
 

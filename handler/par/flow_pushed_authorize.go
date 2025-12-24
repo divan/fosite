@@ -12,7 +12,7 @@ import (
 
 	"github.com/ory/fosite"
 	"github.com/ory/fosite/token/hmac"
-	"github.com/ory/x/errorsx"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -33,12 +33,12 @@ type PushedAuthorizeHandler struct {
 func (c *PushedAuthorizeHandler) HandlePushedAuthorizeEndpointRequest(ctx context.Context, ar fosite.AuthorizeRequester, resp fosite.PushedAuthorizeResponder) error {
 	configProvider, ok := c.Config.(fosite.PushedAuthorizeRequestConfigProvider)
 	if !ok {
-		return errorsx.WithStack(fosite.ErrServerError.WithHint(fosite.ErrorPARNotSupported).WithDebug(fosite.DebugPARConfigMissing))
+		return errors.WithStack(fosite.ErrServerError.WithHint(fosite.ErrorPARNotSupported).WithDebug(fosite.DebugPARConfigMissing))
 	}
 
 	storage, ok := c.Storage.(fosite.PARStorage)
 	if !ok {
-		return errorsx.WithStack(fosite.ErrServerError.WithHint(fosite.ErrorPARNotSupported).WithDebug(fosite.DebugPARStorageInvalid))
+		return errors.WithStack(fosite.ErrServerError.WithHint(fosite.ErrorPARNotSupported).WithDebug(fosite.DebugPARStorageInvalid))
 	}
 
 	if !ar.GetResponseTypes().HasOneOf("token", "code", "id_token") {
@@ -46,13 +46,13 @@ func (c *PushedAuthorizeHandler) HandlePushedAuthorizeEndpointRequest(ctx contex
 	}
 
 	if !c.secureChecker(ctx, ar.GetRedirectURI()) {
-		return errorsx.WithStack(fosite.ErrInvalidRequest.WithHint("Redirect URL is using an insecure protocol, http is only allowed for hosts with suffix 'localhost', for example: http://myapp.localhost/."))
+		return errors.WithStack(fosite.ErrInvalidRequest.WithHint("Redirect URL is using an insecure protocol, http is only allowed for hosts with suffix 'localhost', for example: http://myapp.localhost/."))
 	}
 
 	client := ar.GetClient()
 	for _, scope := range ar.GetRequestedScopes() {
 		if !c.Config.GetScopeStrategy(ctx)(client.GetScopes(), scope) {
-			return errorsx.WithStack(fosite.ErrInvalidScope.WithHintf("The OAuth 2.0 Client is not allowed to request scope '%s'.", scope))
+			return errors.WithStack(fosite.ErrInvalidScope.WithHintf("The OAuth 2.0 Client is not allowed to request scope '%s'.", scope))
 		}
 	}
 
@@ -68,14 +68,14 @@ func (c *PushedAuthorizeHandler) HandlePushedAuthorizeEndpointRequest(ctx contex
 	// generate an ID
 	stateKey, err := hmac.RandomBytes(defaultPARKeyLength)
 	if err != nil {
-		return errorsx.WithStack(fosite.ErrInsufficientEntropy.WithHint("Unable to generate the random part of the request_uri.").WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(fosite.ErrInsufficientEntropy.WithHint("Unable to generate the random part of the request_uri.").WithWrap(err).WithDebug(err.Error()))
 	}
 
 	requestURI := fmt.Sprintf("%s%s", configProvider.GetPushedAuthorizeRequestURIPrefix(ctx), b64.EncodeToString(stateKey))
 
 	// store
 	if err = storage.CreatePARSession(ctx, requestURI, ar); err != nil {
-		return errorsx.WithStack(fosite.ErrServerError.WithHint("Unable to store the PAR session").WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(fosite.ErrServerError.WithHint("Unable to store the PAR session").WithWrap(err).WithDebug(err.Error()))
 	}
 
 	resp.SetRequestURI(requestURI)

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/ory/x/errorsx"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -67,7 +66,7 @@ func TestIntrospectToken(t *testing.T) {
 			description: "should fail because validation fails",
 			setup: func() {
 				store.EXPECT().GetAccessTokenSession(gomock.Any(), "asdf", nil).AnyTimes().Return(areq, nil)
-				chgen.EXPECT().ValidateAccessToken(gomock.Any(), areq, "1234").Return(errorsx.WithStack(fosite.ErrTokenExpired))
+				chgen.EXPECT().ValidateAccessToken(gomock.Any(), areq, "1234").Return(errors.WithStack(fosite.ErrTokenExpired))
 				chgen.EXPECT().RefreshTokenSignature(gomock.Any(), "1234").Return("asdf")
 				store.EXPECT().GetRefreshTokenSession(gomock.Any(), "asdf", nil).Return(nil, errors.New(""))
 			},
@@ -77,7 +76,7 @@ func TestIntrospectToken(t *testing.T) {
 			description: "should fail because access token invalid",
 			setup: func() {
 				config.DisableRefreshTokenValidation = true
-				chgen.EXPECT().ValidateAccessToken(gomock.Any(), areq, "1234").Return(errorsx.WithStack(fosite.ErrInvalidTokenFormat))
+				chgen.EXPECT().ValidateAccessToken(gomock.Any(), areq, "1234").Return(errors.WithStack(fosite.ErrInvalidTokenFormat))
 			},
 			expectErr: fosite.ErrInvalidTokenFormat,
 		},

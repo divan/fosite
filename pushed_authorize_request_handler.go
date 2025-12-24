@@ -5,13 +5,11 @@ package fosite
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
+	"github.com/pkg/errors"
+
 	"github.com/ory/fosite/i18n"
-	"github.com/ory/x/errorsx"
-	"github.com/ory/x/otelx"
-	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -22,19 +20,16 @@ const (
 )
 
 // NewPushedAuthorizeRequest validates the request and produces an AuthorizeRequester object that can be stored
-func (f *Fosite) NewPushedAuthorizeRequest(ctx context.Context, r *http.Request) (_ AuthorizeRequester, err error) {
-	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer("github.com/ory/fosite").Start(ctx, "Fosite.NewPushedAuthorizeRequest")
-	defer otelx.End(span, &err)
-
+func (f *Fosite) NewPushedAuthorizeRequest(ctx context.Context, r *http.Request) (AuthorizeRequester, error) {
 	request := NewAuthorizeRequest()
 	request.Request.Lang = i18n.GetLangFromRequest(f.Config.GetMessageCatalog(ctx), r)
 
 	if r.Method != "POST" {
-		return request, errorsx.WithStack(ErrInvalidRequest.WithHintf("HTTP method is '%s', expected 'POST'.", r.Method))
+		return request, errors.WithStack(ErrInvalidRequest.WithHintf("HTTP method is '%s', expected 'POST'.", r.Method))
 	}
 
 	if err := r.ParseMultipartForm(1 << 20); err != nil && err != http.ErrNotMultipart {
-		return request, errorsx.WithStack(ErrInvalidRequest.WithHint("Unable to parse HTTP body, make sure to send a properly formatted form request body.").WithWrap(err).WithDebug(err.Error()))
+		return request, errors.WithStack(ErrInvalidRequest.WithHint("Unable to parse HTTP body, make sure to send a properly formatted form request body.").WithWrap(err).WithDebug(err.Error()))
 	}
 	request.Form = r.Form
 	request.State = request.Form.Get("state")
@@ -45,7 +40,7 @@ func (f *Fosite) NewPushedAuthorizeRequest(ctx context.Context, r *http.Request)
 	if err != nil {
 		var rfcerr *RFC6749Error
 		if errors.As(err, &rfcerr) && rfcerr.ErrorField != ErrInvalidClient.ErrorField {
-			return request, errorsx.WithStack(ErrInvalidClient.WithHint("The requested OAuth 2.0 Client could not be authenticated.").WithWrap(err).WithDebug(err.Error()))
+			return request, errors.WithStack(ErrInvalidClient.WithHint("The requested OAuth 2.0 Client could not be authenticated.").WithWrap(err).WithDebug(err.Error()))
 		}
 
 		return request, err
@@ -55,7 +50,7 @@ func (f *Fosite) NewPushedAuthorizeRequest(ctx context.Context, r *http.Request)
 	// Reject the request if the "request_uri" authorization request
 	// parameter is provided.
 	if r.Form.Get("request_uri") != "" {
-		return request, errorsx.WithStack(ErrInvalidRequest.WithHint("The request must not contain 'request_uri'."))
+		return request, errors.WithStack(ErrInvalidRequest.WithHint("The request must not contain 'request_uri'."))
 	}
 
 	// For private_key_jwt or basic auth client authentication, "client_id" may not inside the form
@@ -71,7 +66,7 @@ func (f *Fosite) NewPushedAuthorizeRequest(ctx context.Context, r *http.Request)
 	}
 
 	if fr.GetRequestedScopes().Has("openid") && r.Form.Get("redirect_uri") == "" {
-		return fr, errorsx.WithStack(ErrInvalidRequest.WithHint("Query parameter 'redirect_uri' is required when performing an OpenID Connect flow."))
+		return fr, errors.WithStack(ErrInvalidRequest.WithHint("Query parameter 'redirect_uri' is required when performing an OpenID Connect flow."))
 	}
 
 	return fr, nil

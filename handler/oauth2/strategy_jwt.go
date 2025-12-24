@@ -12,7 +12,6 @@ import (
 
 	"github.com/ory/fosite"
 	"github.com/ory/fosite/token/jwt"
-	"github.com/ory/x/errorsx"
 )
 
 // DefaultJWTStrategy is a JWT RS256 strategy.
@@ -80,7 +79,7 @@ func validate(ctx context.Context, jwtStrategy jwt.Signer, token string) (t *jwt
 
 	var e *jwt.ValidationError
 	if err != nil && errors.As(err, &e) {
-		err = errorsx.WithStack(toRFCErr(e).WithWrap(err).WithDebug(err.Error()))
+		err = errors.WithStack(toRFCErr(e).WithWrap(err).WithDebug(err.Error()))
 	}
 
 	return

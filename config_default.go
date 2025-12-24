@@ -12,10 +12,9 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 
-	"github.com/ory/fosite/token/jwt"
-	"github.com/ory/x/randx"
-
 	"github.com/ory/fosite/i18n"
+	"github.com/ory/fosite/internal/randx"
+	"github.com/ory/fosite/token/jwt"
 )
 
 const (

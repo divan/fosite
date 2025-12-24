@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ory/fosite"
-	"github.com/ory/x/errorsx"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -28,7 +28,7 @@ var _ fosite.TokenEndpointHandler = (*Handler)(nil)
 
 func (c *Handler) HandleTokenEndpointRequest(ctx context.Context, request fosite.AccessRequester) error {
 	if !c.CanHandleTokenEndpointRequest(ctx, request) {
-		return errorsx.WithStack(fosite.ErrUnknownRequest)
+		return errors.WithStack(fosite.ErrUnknownRequest)
 	}
 
 	return nil
@@ -40,7 +40,7 @@ func (c *Handler) PopulateTokenEndpointResponse(
 	response fosite.AccessResponder,
 ) error {
 	if !c.CanHandleTokenEndpointRequest(ctx, request) {
-		return errorsx.WithStack(fosite.ErrUnknownRequest)
+		return errors.WithStack(fosite.ErrUnknownRequest)
 	}
 
 	lifespan := c.Config.GetVerifiableCredentialsNonceLifespan(ctx)

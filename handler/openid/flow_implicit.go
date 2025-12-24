@@ -6,7 +6,7 @@ package openid
 import (
 	"context"
 
-	"github.com/ory/x/errorsx"
+	"github.com/pkg/errors"
 
 	"github.com/ory/fosite"
 	"github.com/ory/fosite/handler/oauth2"
@@ -38,14 +38,14 @@ func (c *OpenIDConnectImplicitHandler) HandleAuthorizeEndpointRequest(ctx contex
 	ar.SetDefaultResponseMode(fosite.ResponseModeFragment)
 
 	if !ar.GetClient().GetGrantTypes().Has("implicit") {
-		return errorsx.WithStack(fosite.ErrInvalidGrant.WithHint("The OAuth 2.0 Client is not allowed to use the authorization grant 'implicit'."))
+		return errors.WithStack(fosite.ErrInvalidGrant.WithHint("The OAuth 2.0 Client is not allowed to use the authorization grant 'implicit'."))
 	}
 
 	// Disabled because this is already handled at the authorize_request_handler
 	//if ar.GetResponseTypes().ExactOne("id_token") && !ar.GetClient().GetResponseTypes().Has("id_token") {
-	//	return errorsx.WithStack(fosite.ErrInvalidGrant.WithDebug("The client is not allowed to use response type id_token"))
+	//	return errors.WithStack(fosite.ErrInvalidGrant.WithDebug("The client is not allowed to use response type id_token"))
 	//} else if ar.GetResponseTypes().Matches("token", "id_token") && !ar.GetClient().GetResponseTypes().Has("token", "id_token") {
-	//	return errorsx.WithStack(fosite.ErrInvalidGrant.WithDebug("The client is not allowed to use response type token and id_token"))
+	//	return errors.WithStack(fosite.ErrInvalidGrant.WithDebug("The client is not allowed to use response type token and id_token"))
 	//}
 
 	// This ensures that the 'redirect_uri' parameter is present for OpenID Connect 1.0 authorization requests as per:
@@ -57,25 +57,25 @@ func (c *OpenIDConnectImplicitHandler) HandleAuthorizeEndpointRequest(ctx contex
 	// Note: as per the Hybrid Flow documentation the Hybrid Flow has the same requirements as the Authorization Code Flow.
 	rawRedirectURI := ar.GetRequestForm().Get("redirect_uri")
 	if len(rawRedirectURI) == 0 {
-		return errorsx.WithStack(fosite.ErrInvalidRequest.WithHint("The 'redirect_uri' parameter is required when using OpenID Connect 1.0."))
+		return errors.WithStack(fosite.ErrInvalidRequest.WithHint("The 'redirect_uri' parameter is required when using OpenID Connect 1.0."))
 	}
 
 	if nonce := ar.GetRequestForm().Get("nonce"); len(nonce) == 0 {
-		return errorsx.WithStack(fosite.ErrInvalidRequest.WithHint("Parameter 'nonce' must be set when using the OpenID Connect Implicit Flow."))
+		return errors.WithStack(fosite.ErrInvalidRequest.WithHint("Parameter 'nonce' must be set when using the OpenID Connect Implicit Flow."))
 	} else if len(nonce) < c.Config.GetMinParameterEntropy(ctx) {
-		return errorsx.WithStack(fosite.ErrInsufficientEntropy.WithHintf("Parameter 'nonce' is set but does not satisfy the minimum entropy of %d characters.", c.Config.GetMinParameterEntropy(ctx)))
+		return errors.WithStack(fosite.ErrInsufficientEntropy.WithHintf("Parameter 'nonce' is set but does not satisfy the minimum entropy of %d characters.", c.Config.GetMinParameterEntropy(ctx)))
 	}
 
 	client := ar.GetClient()
 	for _, scope := range ar.GetRequestedScopes() {
 		if !c.Config.GetScopeStrategy(ctx)(client.GetScopes(), scope) {
-			return errorsx.WithStack(fosite.ErrInvalidScope.WithHintf("The OAuth 2.0 Client is not allowed to request scope '%s'.", scope))
+			return errors.WithStack(fosite.ErrInvalidScope.WithHintf("The OAuth 2.0 Client is not allowed to request scope '%s'.", scope))
 		}
 	}
 
 	sess, ok := ar.GetSession().(Session)
 	if !ok {
-		return errorsx.WithStack(ErrInvalidSession)
+		return errors.WithStack(ErrInvalidSession)
 	}
 
 	if err := c.OpenIDConnectRequestValidator.ValidatePrompt(ctx, ar); err != nil {
@@ -85,7 +85,7 @@ func (c *OpenIDConnectImplicitHandler) HandleAuthorizeEndpointRequest(ctx contex
 	claims := sess.IDTokenClaims()
 	if ar.GetResponseTypes().Has("token") {
 		if err := c.AuthorizeImplicitGrantTypeHandler.IssueImplicitAccessToken(ctx, ar, resp); err != nil {
-			return errorsx.WithStack(err)
+			return errors.WithStack(err)
 		}
 
 		ar.SetResponseTypeHandled("token")
@@ -101,7 +101,7 @@ func (c *OpenIDConnectImplicitHandler) HandleAuthorizeEndpointRequest(ctx contex
 
 	idTokenLifespan := fosite.GetEffectiveLifespan(ar.GetClient(), fosite.GrantTypeImplicit, fosite.IDToken, c.Config.GetIDTokenLifespan(ctx))
 	if err := c.IssueImplicitIDToken(ctx, idTokenLifespan, ar, resp); err != nil {
-		return errorsx.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	// there is no need to check for https, because implicit flow does not require https

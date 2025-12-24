@@ -7,7 +7,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/ory/x/errorsx"
+	"github.com/pkg/errors"
 
 	"github.com/ory/fosite"
 	enigma "github.com/ory/fosite/token/hmac"
@@ -52,11 +52,11 @@ func (h *HMACSHAStrategyUnPrefixed) GenerateAccessToken(ctx context.Context, _ f
 func (h *HMACSHAStrategyUnPrefixed) ValidateAccessToken(ctx context.Context, r fosite.Requester, token string) (err error) {
 	var exp = r.GetSession().GetExpiresAt(fosite.AccessToken)
 	if exp.IsZero() && r.GetRequestedAt().Add(h.Config.GetAccessTokenLifespan(ctx)).Before(time.Now().UTC()) {
-		return errorsx.WithStack(fosite.ErrTokenExpired.WithHintf("Access token expired at '%s'.", r.GetRequestedAt().Add(h.Config.GetAccessTokenLifespan(ctx))))
+		return errors.WithStack(fosite.ErrTokenExpired.WithHintf("Access token expired at '%s'.", r.GetRequestedAt().Add(h.Config.GetAccessTokenLifespan(ctx))))
 	}
 
 	if !exp.IsZero() && exp.Before(time.Now().UTC()) {
-		return errorsx.WithStack(fosite.ErrTokenExpired.WithHintf("Access token expired at '%s'.", exp))
+		return errors.WithStack(fosite.ErrTokenExpired.WithHintf("Access token expired at '%s'.", exp))
 	}
 
 	return h.Enigma.Validate(ctx, token)
@@ -79,7 +79,7 @@ func (h *HMACSHAStrategyUnPrefixed) ValidateRefreshToken(ctx context.Context, r 
 	}
 
 	if !exp.IsZero() && exp.Before(time.Now().UTC()) {
-		return errorsx.WithStack(fosite.ErrTokenExpired.WithHintf("Refresh token expired at '%s'.", exp))
+		return errors.WithStack(fosite.ErrTokenExpired.WithHintf("Refresh token expired at '%s'.", exp))
 	}
 
 	return h.Enigma.Validate(ctx, token)
@@ -97,11 +97,11 @@ func (h *HMACSHAStrategyUnPrefixed) GenerateAuthorizeCode(ctx context.Context, _
 func (h *HMACSHAStrategyUnPrefixed) ValidateAuthorizeCode(ctx context.Context, r fosite.Requester, token string) (err error) {
 	var exp = r.GetSession().GetExpiresAt(fosite.AuthorizeCode)
 	if exp.IsZero() && r.GetRequestedAt().Add(h.Config.GetAuthorizeCodeLifespan(ctx)).Before(time.Now().UTC()) {
-		return errorsx.WithStack(fosite.ErrTokenExpired.WithHintf("Authorize code expired at '%s'.", r.GetRequestedAt().Add(h.Config.GetAuthorizeCodeLifespan(ctx))))
+		return errors.WithStack(fosite.ErrTokenExpired.WithHintf("Authorize code expired at '%s'.", r.GetRequestedAt().Add(h.Config.GetAuthorizeCodeLifespan(ctx))))
 	}
 
 	if !exp.IsZero() && exp.Before(time.Now().UTC()) {
-		return errorsx.WithStack(fosite.ErrTokenExpired.WithHintf("Authorize code expired at '%s'.", exp))
+		return errors.WithStack(fosite.ErrTokenExpired.WithHintf("Authorize code expired at '%s'.", exp))
 	}
 
 	return h.Enigma.Validate(ctx, token)

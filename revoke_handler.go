@@ -9,10 +9,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ory/x/errorsx"
-	"github.com/ory/x/otelx"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/pkg/errors"
 )
 
@@ -33,18 +29,15 @@ import (
 // * https://tools.ietf.org/html/rfc7009#section-2.2
 // An invalid token type hint value is ignored by the authorization
 // server and does not influence the revocation response.
-func (f *Fosite) NewRevocationRequest(ctx context.Context, r *http.Request) (err error) {
-	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer("github.com/ory/fosite").Start(ctx, "Fosite.NewRevocationRequest")
-	defer otelx.End(span, &err)
-
+func (f *Fosite) NewRevocationRequest(ctx context.Context, r *http.Request) error {
 	ctx = context.WithValue(ctx, RequestContextKey, r)
 
 	if r.Method != "POST" {
-		return errorsx.WithStack(ErrInvalidRequest.WithHintf("HTTP method is '%s' but expected 'POST'.", r.Method))
+		return errors.WithStack(ErrInvalidRequest.WithHintf("HTTP method is '%s' but expected 'POST'.", r.Method))
 	} else if err := r.ParseMultipartForm(1 << 20); err != nil && err != http.ErrNotMultipart {
-		return errorsx.WithStack(ErrInvalidRequest.WithHint("Unable to parse HTTP body, make sure to send a properly formatted form request body.").WithWrap(err).WithDebug(err.Error()))
+		return errors.WithStack(ErrInvalidRequest.WithHint("Unable to parse HTTP body, make sure to send a properly formatted form request body.").WithWrap(err).WithDebug(err.Error()))
 	} else if len(r.PostForm) == 0 {
-		return errorsx.WithStack(ErrInvalidRequest.WithHint("The POST body can not be empty."))
+		return errors.WithStack(ErrInvalidRequest.WithHint("The POST body can not be empty."))
 	}
 
 	client, err := f.AuthenticateClient(ctx, r, r.PostForm)
@@ -67,7 +60,7 @@ func (f *Fosite) NewRevocationRequest(ctx context.Context, r *http.Request) (err
 	}
 
 	if !found {
-		return errorsx.WithStack(ErrInvalidRequest)
+		return errors.WithStack(ErrInvalidRequest)
 	}
 
 	return nil

@@ -8,16 +8,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/ory/x/errorsx"
-	"github.com/ory/x/otelx"
-	"go.opentelemetry.io/otel/trace"
+	"github.com/pkg/errors"
 )
 
-func (f *Fosite) NewAuthorizeResponse(ctx context.Context, ar AuthorizeRequester, session Session) (_ AuthorizeResponder, err error) {
-	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer("github.com/ory/fosite").Start(ctx, "Fosite.NewAuthorizeResponse")
-	defer otelx.End(span, &err)
-
-	var resp = &AuthorizeResponse{
+func (f *Fosite) NewAuthorizeResponse(ctx context.Context, ar AuthorizeRequester, session Session) (AuthorizeResponder, error) {
+	resp := &AuthorizeResponse{
 		Header:     http.Header{},
 		Parameters: url.Values{},
 	}
@@ -33,7 +28,7 @@ func (f *Fosite) NewAuthorizeResponse(ctx context.Context, ar AuthorizeRequester
 	}
 
 	if !ar.DidHandleAllResponseTypes() {
-		return nil, errorsx.WithStack(ErrUnsupportedResponseType)
+		return nil, errors.WithStack(ErrUnsupportedResponseType)
 	}
 
 	if ar.GetDefaultResponseMode() == ResponseModeFragment && ar.GetResponseMode() == ResponseModeQuery {

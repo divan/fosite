@@ -8,7 +8,6 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/ory/fosite/i18n"
-	"github.com/ory/x/errorsx"
 )
 
 // AddLocalizerToErr augments the error object with the localizer
@@ -31,7 +30,7 @@ func AddLocalizerToErrWithLang(catalog i18n.MessageCatalog, lang language.Tag, e
 	var e RFC6749Error
 	if errors.As(err, &e) {
 		return e.WithLocalizer(catalog, lang)
-	} else if errors.As(errorsx.Cause(err), &e) {
+	} else if errors.As(errors.Cause(err), &e) {
 		return e.WithLocalizer(catalog, lang)
 	}
 	return err

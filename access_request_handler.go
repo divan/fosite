@@ -8,12 +8,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ory/fosite/i18n"
-	"github.com/ory/x/errorsx"
-	"github.com/ory/x/otelx"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/pkg/errors"
+
+	"github.com/ory/fosite/i18n"
 )
 
 // Implements
@@ -41,10 +38,7 @@ import (
 //     credentials (or assigned other authentication requirements), the
 //     client MUST authenticate with the authorization server as described
 //     in Section 3.2.1.
-func (f *Fosite) NewAccessRequest(ctx context.Context, r *http.Request, session Session) (_ AccessRequester, err error) {
-	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer("github.com/ory/fosite").Start(ctx, "Fosite.NewAccessRequest")
-	defer otelx.End(span, &err)
-
+func (f *Fosite) NewAccessRequest(ctx context.Context, r *http.Request, session Session) (AccessRequester, error) {
 	accessRequest := NewAccessRequest(session)
 	accessRequest.Request.Lang = i18n.GetLangFromRequest(f.Config.GetMessageCatalog(ctx), r)
 
@@ -52,11 +46,11 @@ func (f *Fosite) NewAccessRequest(ctx context.Context, r *http.Request, session 
 	ctx = context.WithValue(ctx, AccessRequestContextKey, accessRequest)
 
 	if r.Method != "POST" {
-		return accessRequest, errorsx.WithStack(ErrInvalidRequest.WithHintf("HTTP method is '%s', expected 'POST'.", r.Method))
+		return accessRequest, errors.WithStack(ErrInvalidRequest.WithHintf("HTTP method is '%s', expected 'POST'.", r.Method))
 	} else if err := r.ParseMultipartForm(1 << 20); err != nil && err != http.ErrNotMultipart {
-		return accessRequest, errorsx.WithStack(ErrInvalidRequest.WithHint("Unable to parse HTTP body, make sure to send a properly formatted form request body.").WithWrap(err).WithDebug(err.Error()))
+		return accessRequest, errors.WithStack(ErrInvalidRequest.WithHint("Unable to parse HTTP body, make sure to send a properly formatted form request body.").WithWrap(err).WithDebug(err.Error()))
 	} else if len(r.PostForm) == 0 {
-		return accessRequest, errorsx.WithStack(ErrInvalidRequest.WithHint("The POST body can not be empty."))
+		return accessRequest, errors.WithStack(ErrInvalidRequest.WithHint("The POST body can not be empty."))
 	}
 
 	accessRequest.Form = r.PostForm
@@ -68,7 +62,7 @@ func (f *Fosite) NewAccessRequest(ctx context.Context, r *http.Request, session 
 	accessRequest.SetRequestedAudience(GetAudiences(r.PostForm))
 	accessRequest.GrantTypes = RemoveEmpty(strings.Split(r.PostForm.Get("grant_type"), " "))
 	if len(accessRequest.GrantTypes) < 1 {
-		return accessRequest, errorsx.WithStack(ErrInvalidRequest.WithHint("Request parameter 'grant_type' is missing"))
+		return accessRequest, errors.WithStack(ErrInvalidRequest.WithHint("Request parameter 'grant_type' is missing"))
 	}
 
 	client, clientErr := f.AuthenticateClient(ctx, r, r.PostForm)
@@ -105,7 +99,7 @@ func (f *Fosite) NewAccessRequest(ctx context.Context, r *http.Request, session 
 	}
 
 	if !found {
-		return nil, errorsx.WithStack(ErrInvalidRequest)
+		return nil, errors.WithStack(ErrInvalidRequest)
 	}
 	return accessRequest, nil
 }
